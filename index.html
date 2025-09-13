@@ -284,6 +284,8 @@
 
         #test-status {
             font-style: italic;
+            flex-grow: 1;
+            padding-left: 15px;
         }
 
         .test-button, .save-button {
@@ -420,19 +422,19 @@
                 <select id="api-model">
                     <option value="gpt-4">GPT-4</option>
                     <option value="gpt-3.5-turbo" selected>GPT-3.5-Turbo</option>
-                    <option value="custom">gemini-2.5-pro</option>
+                    <option value="custom">自定义</option>
                 </select>
             </div>
              <div class="modal-footer">
                 <button id="test-api-button" class="test-button">发送测试</button>
                 <span id="test-status"></span>
-                 <button class="save-button">保存</button>
+                <button class="save-button">保存</button>
             </div>
         </div>
     </div>
 
     <script>
-        // Modal 逻辑
+        // --- Modal 逻辑 ---
         const modal = document.getElementById('api-settings-modal');
         const settingsButton = document.getElementById('settings-button');
         const closeButton = document.querySelector('.close-button');
@@ -451,7 +453,7 @@
             }
         }
 
-        // API 测试逻辑
+        // --- API 测试逻辑 ---
         const testApiButton = document.getElementById('test-api-button');
         const apiUrlInput = document.getElementById('api-url');
         const apiKeyInput = document.getElementById('api-key');
@@ -464,15 +466,17 @@
             const model = apiModelSelect.value;
 
             if (!url || !apiKey) {
-                testStatus.textContent = 'URL和密钥不能为空!';
+                testStatus.textContent = '错误: URL和密钥不能为空!';
                 testStatus.style.color = 'red';
                 return;
             }
 
             testStatus.textContent = '测试中...';
             testStatus.style.color = 'var(--text-light)';
+            testApiButton.disabled = true; // 防止重复点击
 
             try {
+                // 发送网络请求
                 const response = await fetch(url, {
                     method: 'POST',
                     headers: {
@@ -482,26 +486,31 @@
                     body: JSON.stringify({
                         model: model,
                         messages: [{ role: "user", content: "Say this is a test!" }],
-                        max_tokens: 7,
+                        max_tokens: 7, // 限制返回长度，节省token
                         temperature: 0
                     })
                 });
 
+                // 检查HTTP响应状态
                 if (response.ok) {
                     const data = await response.json();
-                    console.log('API Response:', data);
+                    console.log('API 成功响应:', data);
                     testStatus.textContent = '连接成功!';
                     testStatus.style.color = 'green';
                 } else {
-                    const errorData = await response.json();
-                    console.error('API Error:', errorData);
-                    testStatus.textContent = `连接失败: ${response.status} ${errorData.error.message}`;
+                    // 如果服务器返回了错误（如401, 404, 500等）
+                    const errorData = await response.json().catch(() => ({ error: { message: '无法解析错误信息' } })); // 以防错误信息不是json
+                    console.error('API 返回错误:', response.status, errorData);
+                    testStatus.textContent = `API错误: ${response.status} - ${errorData.error?.message || '未知错误'}`;
                     testStatus.style.color = 'red';
                 }
             } catch (error) {
-                console.error('Fetch Error:', error);
-                testStatus.textContent = '连接失败! 检查URL或网络。';
+                // 如果fetch本身失败了（例如网络不通, URL格式错误, CORS问题）
+                console.error('Fetch 网络请求失败:', error);
+                testStatus.textContent = '网络错误! 检查URL或按F12看控制台';
                 testStatus.style.color = 'red';
+            } finally {
+                testApiButton.disabled = false; // 恢复按钮
             }
         });
 
